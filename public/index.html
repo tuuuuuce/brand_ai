@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Brand Creator</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <div class="container">
+      <h1>Create Your Brand</h1>
+      <form id="brandForm">
+        <textarea id="description" placeholder="Enter your project description"></textarea>
+        <button type="submit">Create Brand</button>
+      </form>
+      <div id="loading" class="loading" style="display: none">Loading...</div>
+      <div class="logo-container" id="logoResult"></div>
+      <div id="brandStrategy"></div>
+      <!-- Add regenerate buttons -->
+      <div class="regenerate-buttons">
+        <button id="regenerateStrategy" style="display: none">Regenerate Strategy</button>
+        <button id="regenerateLogo" style="display: none">Regenerate Logo</button>
+      </div>
+    </div>
+
+    <script>
+      const brandForm = document.getElementById('brandForm')
+      const brandStrategyDiv = document.getElementById('brandStrategy')
+      const logoResultDiv = document.getElementById('logoResult')
+      const loadingDiv = document.getElementById('loading')
+
+      // Add this after your existing script code
+      const regenerateStrategyBtn = document.getElementById('regenerateStrategy')
+      const regenerateLogoBtn = document.getElementById('regenerateLogo')
+
+      // Store the original description
+      let currentDescription = ''
+
+      // Modify the existing form submission handler
+      brandForm.addEventListener('submit', async e => {
+        e.preventDefault()
+        currentDescription = document.getElementById('description').value
+        await generateBrandStrategy(currentDescription)
+      })
+
+      // Function to generate brand strategy
+      async function generateBrandStrategy(description) {
+        loadingDiv.style.display = 'block'
+        brandStrategyDiv.innerHTML = ''
+        logoResultDiv.innerHTML = ''
+        regenerateStrategyBtn.style.display = 'none'
+        regenerateLogoBtn.style.display = 'none'
+
+        try {
+          const response = await fetch('/create-brand', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ description }),
+          })
+
+          const data = await response.json()
+          loadingDiv.style.display = 'none'
+
+          if (data.brandStrategy) {
+            brandStrategyDiv.innerHTML = marked.parse(data.brandStrategy)
+            regenerateStrategyBtn.style.display = 'block'
+            await generateLogo(data.brandStrategy)
+          } else {
+            brandStrategyDiv.innerHTML = 'Error generating brand strategy'
+          }
+        } catch (error) {
+          loadingDiv.style.display = 'none'
+          brandStrategyDiv.innerHTML = 'Error generating brand strategy'
+        }
+      }
+
+      // Function to generate logo
+      async function generateLogo(brandStrategy) {
+        logoResultDiv.innerHTML = '<div class="loading">Creating your brand logo...</div>'
+        logoResultDiv.style.display = 'block'
+
+        try {
+          const logoResponse = await fetch('/generate-logo', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ brandStrategy }),
+          })
+
+          const logoData = await logoResponse.json()
+          if (logoData.imageUrl) {
+            logoResultDiv.innerHTML = `
+              <div class="logo-wrapper">
+                <img src="${logoData.imageUrl}" alt="Generated Logo">
+                <button id="regenerateLogo" class="regenerate-button">Regenerate Logo</button>
+              </div>`
+
+            // Add event listener to the new button
+            document.getElementById('regenerateLogo').addEventListener('click', async () => {
+              const brandStrategy = brandStrategyDiv.textContent
+              await generateLogo(brandStrategy)
+            })
+          } else {
+            logoResultDiv.innerHTML = '<div class="error">Failed to generate logo</div>'
+          }
+        } catch (error) {
+          logoResultDiv.innerHTML = '<div class="error">Error generating logo</div>'
+        }
+      }
+
+      // Add regenerate event listeners
+      regenerateStrategyBtn.addEventListener('click', async () => {
+        await generateBrandStrategy(currentDescription)
+      })
+
+      // Helper function to extract brand strategy text
+      function extractBrandStrategyText() {
+        return brandStrategyDiv.textContent
+      }
+    </script>
+  </body>
+</html>
